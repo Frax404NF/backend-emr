@@ -45,5 +45,4 @@ router.put(
   patientController.updatePatient
 );
 
-
 module.exports = router;
