@@ -45,32 +45,5 @@ router.put(
   patientController.updatePatient
 );
 
-router.delete(
-  "/patients/:id",
-  requireRole(["Admin"]),
-  requirePermission("patients:delete"),
-  patientController.deletePatient
-);
-
-// Rute encounter
-router.post(
-  "/encounters",
-  requireRole(["Dokter", "Perawat"]),
-  requirePermission("encounters:create"),
-  encounterController.createEncounter
-);
-
-router.get(
-  "/encounters/:id",
-  requirePermission("encounters:read"),
-  encounterController.getEncounterById
-);
-
-router.put(
-  "/encounters/:id",
-  requireRole(["Dokter", "Perawat"]),
-  requirePermission("encounters:update"),
-  encounterController.updateEncounter
-);
 
 module.exports = router;
