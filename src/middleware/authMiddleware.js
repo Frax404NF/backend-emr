@@ -1,67 +1,51 @@
 const supabase = require("../config/supabase");
-const { prisma } = require("../config/prisma");
-const { createError } = require("../utils/error");
-const { checkPermission } = require("../utils/rbacPolicies");
 
-// Middleware autentikasi menggunakan Supabase
-const supabaseAuth = async (req, res, next) => {
-  try {
-    // 1. Ambil token dari header Authorization
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return next(createError(401, "Authentication token missing"));
+const authenticate = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-    // 2. Verifikasi token dengan Supabase
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-    if (error || !user) return next(createError(401, "Invalid token"));
-
-    // 3. Cari data staff berdasarkan auth_user_id
-    const staff = await prisma.medicStaff.findUnique({
-      where: { auth_user_id: user.id },
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      success: false,
+      message: "Authorization token required",
     });
+  }
 
-    if (!staff) return next(createError(404, "Staff not found"));
+  const token = authHeader.split(" ")[1];
 
-    // 4. Menyisipkan informasi user ke objek request
+  try {
+    // Verifikasi token dengan Supabase
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) throw error;
+
+    // Dapatkan data staff lengkap
+    const { data: staff, error: staffError } = await supabase
+      .from("medic_staff")
+      .select("staff_id, staff_name, role, specialization, email")
+      .eq("auth_uid", data.user.id)
+      .single();
+
+    if (staffError) throw staffError;
+
+    // Simpan user info di request
     req.user = {
-      id: staff.staff_id,
-      auth_id: user.id,
-      role: staff.role,
-      email: staff.staff_email,
-      name: staff.staff_name,
+      id: data.user.id,
+      ...staff,
     };
 
     next();
   } catch (error) {
-    next(createError(500, "Authentication failed", error));
+    console.error("Authentication error:", error.message);
+
+    const statusCode = error.message.includes("token") ? 401 : 500;
+    const message = error.message.includes("token")
+      ? "Invalid or expired token"
+      : "Authentication failed";
+
+    res.status(statusCode).json({
+      success: false,
+      message,
+    });
   }
 };
 
-// Middleware untuk membatasi akses berdasarkan peran (role)
-const requireRole = (allowedRoles) => {
-  return (req, res, next) => {
-    if (!allowedRoles.includes(req.user.role)) {
-      return next(createError(403, "Insufficient permissions"));
-    }
-    next();
-  };
-};
-
-// Middleware untuk membatasi akses berdasarkan permission tertentu
-const requirePermission = (permission) => {
-  return (req, res, next) => {
-    const hasPermission = checkPermission(req.user.role, permission);
-    if (!hasPermission) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    next();
-  };
-};
-
-module.exports = {
-  supabaseAuth,
-  requireRole,
-  requirePermission,
-};
+module.exports = { authenticate };

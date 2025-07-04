@@ -21,19 +21,10 @@ Thumbs.db
 dist/
 build/
 
-# Prisma generated files
-prisma/dev.db
-prisma/dev.db-journal
-prisma/seed.js
 
 # Test coverage
 coverage/
 *.lcov
-
-# Misc
-*.local
-*.sublime-workspace
-*.sublime-project
 
 # VSCode settings
 .vscode/
@@ -46,4 +37,4 @@ tests/output/
 baseline.sql
 
 #draft file
-src/controllers/encounter.controller.js
+src/services/hash.js
