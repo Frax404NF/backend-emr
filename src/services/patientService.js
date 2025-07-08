@@ -1,8 +1,58 @@
 const supabase = require("../config/supabase");
-const { errorMessages } = require("../utils/errorMessages");
+const errorMessages = require("../utils/errorMessages");
 
 const createPatient = async (patientData) => {
   try {
+    // Handle emergency patient creation
+    if (patientData.is_emergency) {
+      // Generate temporary NIK for emergency patients
+      const tempNIK = generateTempNIK();
+
+      // For emergency patients, use input date or current date as placeholder
+      // This is required because the database has a NOT NULL constraint on date_of_birth
+      const emergencyPatientData = {
+        ...patientData,
+        NIK: tempNIK,
+        date_of_birth: patientData.date_of_birth || new Date().toISOString().split('T')[0], // Use input date or today as fallback
+        patient_history_of_allergies: patientData.patient_history_of_allergies || "Tidak diketahui",
+        patient_disease_history: patientData.patient_disease_history || "Tidak diketahui",
+        is_emergency: true,
+        is_temporary: true, // Flag to indicate this is temporary registration
+      };
+
+      const { data, error } = await supabase
+        .from("patients")
+        .insert([emergencyPatientData])
+        .select(
+          `
+          patient_id,
+          patient_name,
+          NIK,
+          date_of_birth,
+          blood_type,
+          gender,
+          phone_number,
+          emergency_contact_name,
+          emergency_contact_phonenumber,
+          patient_history_of_allergies,
+          patient_disease_history,
+          created_at,
+          created_by,
+          is_emergency,
+          is_temporary,
+          medic_staff_created:created_by (staff_id, staff_name)
+        `
+        )
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return data;
+    }
+
+    // Regular patient creation
     const { data, error } = await supabase
       .from("patients")
       .insert([patientData])
@@ -24,6 +74,42 @@ const createPatient = async (patientData) => {
         medic_staff_created:created_by (staff_id, staff_name)
       `
       )
+      .single();
+
+    if (error) {
+      if (error.code === "23505")
+        throw new Error(errorMessages.NIK_EXISTS.message);
+      throw new Error(error.message);
+    }
+
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Generate temporary NIK for emergency patients
+const generateTempNIK = () => {
+  const timestamp = Date.now().toString();
+  const randomNum = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+  // Format: TEMP + 8 digits from timestamp + 2 random digits = 14 characters total
+  return `TEMP${timestamp.slice(-8)}${randomNum}`;
+};
+
+// Function to update emergency patient with complete information
+const updateEmergencyPatientToRegular = async (patientId, completeData) => {
+  try {
+    const { data, error } = await supabase
+      .from("patients")
+      .update({
+        ...completeData,
+        is_emergency: false,
+        is_temporary: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("patient_id", patientId)
+      .eq("is_emergency", true)
+      .select()
       .single();
 
     if (error) {
@@ -210,4 +296,5 @@ module.exports = {
   getAllPatients,
   searchPatients,
   softDeletePatient,
+  updateEmergencyPatientToRegular,
 };

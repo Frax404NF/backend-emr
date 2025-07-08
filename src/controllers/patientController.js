@@ -1,6 +1,6 @@
 const patientService = require("../services/patientService");
 const { successResponse, errorResponse } = require("../utils/response");
-const { errorMessages } = require("../utils/errorMessages");
+const errorMessages = require("../utils/errorMessages");
 
 const createPatient = async (req, res) => {
   try {
@@ -19,7 +19,11 @@ const createPatient = async (req, res) => {
     };
     delete formattedResponse.medic_staff_created;
 
-    successResponse(res, formattedResponse, "Pasien berhasil didaftarkan", 201);
+    const message = patientData.is_emergency
+      ? "Pasien darurat berhasil didaftarkan"
+      : "Pasien berhasil didaftarkan";
+
+    successResponse(res, formattedResponse, message, 201);
   } catch (error) {
     const status =
       error.message === errorMessages.NIK_EXISTS.message
@@ -115,6 +119,36 @@ const deletePatient = async (req, res) => {
   }
 };
 
+const updateEmergencyPatientToRegular = async (req, res) => {
+  try {
+    const patientId = parseInt(req.params.patientId);
+    const updateData = {
+      ...req.body,
+      updated_by: req.user.staff_id,
+    };
+
+    const updatedPatient = await patientService.updateEmergencyPatientToRegular(
+      patientId,
+      updateData
+    );
+
+    successResponse(
+      res,
+      updatedPatient,
+      "Pasien darurat berhasil diupdate dengan data lengkap"
+    );
+  } catch (error) {
+    const status =
+      error.message === errorMessages.NIK_EXISTS.message
+        ? 409
+        : error.message === errorMessages.PATIENT_NOT_FOUND.message
+        ? 404
+        : 400;
+
+    errorResponse(res, error.message, status);
+  }
+};
+
 module.exports = {
   createPatient,
   getPatientById,
@@ -122,4 +156,5 @@ module.exports = {
   updatePatient,
   searchPatients,
   deletePatient,
+  updateEmergencyPatientToRegular,
 };
