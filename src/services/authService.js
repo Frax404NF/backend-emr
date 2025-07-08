@@ -80,7 +80,7 @@ const signOut = async (accessToken) => {
 const getStaffProfile = async (authUid) => {
   const { data, error } = await supabase
     .from("medic_staff")
-    .select("staff_id, staff_name, role, specialization")
+    .select("staff_id, staff_name, email, role, specialization")
     .eq("auth_uid", authUid)
     .single();
 
