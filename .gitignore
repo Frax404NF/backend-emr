@@ -36,5 +36,8 @@ tests/output/
 # Ignore local SQL dumps
 baseline.sql
 
+# Documentation folder (internal development docs)
+docs/
+
 #draft file
 src/services/hash.js
