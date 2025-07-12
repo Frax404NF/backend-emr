@@ -311,26 +311,6 @@ const validateStatusUpdate = (req, res, next) => {
 };
 
 /**
- * Middleware validasi untuk catatan SOAP (Subjective, Objective, Assessment, Plan)
- * Semua komponen SOAP wajib diisi
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
-const validateSoapNote = (req, res, next) => {
-  const { subjective, objective, assessment, plan } = req.body;
-
-  if (!subjective || !objective || !assessment || !plan) {
-    return res.status(400).json({
-      success: false,
-      message: "Semua komponen SOAP wajib diisi",
-    });
-  }
-
-  next();
-};
-
-/**
  * Middleware validasi untuk pembuatan pasien darurat (emergency)
  * Hanya membutuhkan nama pasien dan jenis kelamin
  * Untuk tanggal lahir (date_of_birth):
@@ -398,7 +378,7 @@ const validateEmergencyPatientCreation = (req, res, next) => {
 
   // Validate blood type if provided
   if (req.body.blood_type) {
-    const validBloodTypes = ["A", "B", "AB", "O"];
+    const validBloodTypes = ["A", "B", "AB", "O", "UNKNOWN"];
     if (!validBloodTypes.includes(req.body.blood_type)) {
       return res.status(400).json({
         success: false,
@@ -422,6 +402,5 @@ module.exports = {
   validatePatientUpdate,
   validateEncounterCreation,
   validateStatusUpdate,
-  validateSoapNote,
   validateEmergencyPatientCreation
 };
