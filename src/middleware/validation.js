@@ -402,5 +402,5 @@ module.exports = {
   validatePatientUpdate,
   validateEncounterCreation,
   validateStatusUpdate,
-  validateEmergencyPatientCreation
+  validateEmergencyPatientCreation,
 };
