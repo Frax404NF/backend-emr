@@ -75,7 +75,10 @@ const getFullEncounter = async (encounterId) => {
         patient_id,
         patient_name,
         date_of_birth,
-        gender
+        gender,
+        blood_type,
+        patient_history_of_allergies,
+        patient_disease_history
       ),
       vital_signs(
         vital_sign_id,
