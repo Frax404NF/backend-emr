@@ -147,7 +147,9 @@ const getPatientById = async (patientId) => {
         updated_by,
         medic_staff_created:created_by (staff_id, staff_name),
         medic_staff_updated:updated_by (staff_id, staff_name),
-        is_deleted
+        is_deleted,
+        is_emergency,
+        is_temporary
       `
       )
       .eq("patient_id", patientId)
