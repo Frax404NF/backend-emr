@@ -47,4 +47,19 @@ module.exports = {
     code: 500,
     message: "Gagal memperbarui status"
   },
+
+  // Vital Signs Errors
+  VITAL_SIGN_INVALID: {
+    code: 400,
+    message: "Data tanda vital tidak valid"
+  },
+  VITAL_SIGN_REQUIRED: {
+    code: 400,
+    message: "Data tanda vital diperlukan"
+  },
+  VITAL_SIGN_NOT_FOUND: {
+    code: 404,
+    message: "Catatan tanda vital tidak ditemukan"
+  },
+
 };
