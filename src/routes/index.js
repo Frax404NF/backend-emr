@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 const patientController = require("../controllers/patientController");
 const encounterController = require("../controllers/encounterController");
+const vitalSignsController = require("../controllers/clinical/vitalSignsController");
 const {
   validateSignUp,
   validateSignIn,
@@ -51,6 +52,13 @@ router.put('/encounters/:encounterId/status', authenticate, clinicalStaff, valid
 router.get('/encounters/:encounterId', authenticate, encounterController.getEncounterDetails);
  // List all active encounters.
 router.get('/encounters', authenticate, clinicalStaff, encounterController.listActiveEncounters);
+
+
+// ===================== Vital Signs Routes =====================
+router.post('/encounters/:encounterId/vitals', authenticate, clinicalStaff, vitalSignsController.createVitalSign);
+router.get('/encounters/:encounterId/vitals', authenticate, clinicalStaff, vitalSignsController.getVitalSignsByEncounter);
+router.get('/vitals/:id', authenticate, clinicalStaff, vitalSignsController.getVitalSignById);
+
 
 
 module.exports = router;
