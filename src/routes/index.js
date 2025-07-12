@@ -43,13 +43,13 @@ router.put("/patients/:patientId", authenticate, authorizeRoles(["DOCTOR"]), val
 router.delete("/patients/:patientId", authenticate, authorizeRoles(["DOCTOR"]), patientController.deletePatient);
 
 // Encounter routes
-// @route POST /encounters - Start a new patient encounter (clinical staff only).
+// Start a new patient encounter (clinical staff only).
 router.post('/encounters', authenticate, clinicalStaff, validateEncounterCreation, encounterController.startEncounter);
-// @route PUT /encounters/:encounterId/status - Update encounter status (clinical staff only).
+// Update encounter status (clinical staff only).
 router.put('/encounters/:encounterId/status', authenticate, clinicalStaff, validateStatusUpdate, encounterController.changeStatus);
- // @route GET /encounters/:encounterId - Get details of a specific encounter.
+// Get details of a specific encounter.
 router.get('/encounters/:encounterId', authenticate, encounterController.getEncounterDetails);
- // @route GET /encounters - List all active encounters.
+ // List all active encounters.
 router.get('/encounters', authenticate, clinicalStaff, encounterController.listActiveEncounters);
 
 
