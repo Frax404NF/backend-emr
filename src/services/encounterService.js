@@ -88,8 +88,9 @@ const getFullEncounter = async (encounterId) => {
       diagnoses(
         diagnosis_id,
         icd10_code,
-        diagnoses_notes,
-        diagnosed_at
+        diagnoses_name,
+        diagnosed_at,
+        created_by
       ),
       treatments(
         treatment_id,
