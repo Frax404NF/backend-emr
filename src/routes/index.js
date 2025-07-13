@@ -64,9 +64,7 @@ router.get('/vitals/:id', authenticate, clinicalStaff, vitalSignsController.getV
 
 // ===================== Diagnosis Routes =====================
 router.post( '/encounters/:encounterId/diagnoses',authenticate, authorizeRoles(["DOCTOR"]), diagnosisController.createDiagnosis);
-
 router.get('/encounters/:encounterId/diagnoses', authenticate, clinicalStaff, diagnosisController.getDiagnosesByEncounter);
-
 router.get('/icd10/search', authenticate, clinicalStaff, diagnosisController.searchICD10);
 
 // ===================== Treatment Routes =====================
