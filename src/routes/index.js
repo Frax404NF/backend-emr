@@ -6,6 +6,7 @@ const encounterController = require("../controllers/encounterController");
 const vitalSignsController = require("../controllers/clinical/vitalSignsController");
 const diagnosisController = require("../controllers/clinical/diagnosisController");
 const treatmentController = require("../controllers/clinical/treatmentController");
+const soapNotesController = require("../controllers/clinical/soapNotesController");
 
 const {
   validateSignUp,
@@ -70,5 +71,9 @@ router.get('/icd10/search', authenticate, clinicalStaff, diagnosisController.sea
 // ===================== Treatment Routes =====================
 router.post('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.createTreatment);
 router.get('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.getTreatmentsByEncounter);
+
+// ===================== SOAP Notes Routes =====================
+router.post('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, soapNotesController.createSoapNote);
+router.get('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, soapNotesController.getSoapNotesByEncounter);
 
 module.exports = router;
