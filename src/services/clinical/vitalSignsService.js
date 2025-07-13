@@ -69,7 +69,10 @@ exports.createVitalSign = async (encounterId, vitalData, staffId) => {
 exports.getVitalSignsByEncounter = async (encounterId) => {
   const { data, error } = await supabase
     .from("vital_signs")
-    .select("*")
+    .select(`
+      *,
+      medic_staff:created_by(staff_id, staff_name)
+    `)
     .eq("encounter_id", encounterId)
     .order("measurement_time", { ascending: false });
 

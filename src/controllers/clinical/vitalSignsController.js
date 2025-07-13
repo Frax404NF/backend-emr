@@ -49,6 +49,7 @@ exports.getVitalSignsByEncounter = async (req, res) => {
       time: vs.measurement_time,
       data: vs.vital_sign_data,
       created_by: vs.created_by,
+      medic_staff: vs.medic_staff // staff info jika tersedia
     }));
 
     successResponse(res, transformed, "Data tanda vital berhasil diambil");
