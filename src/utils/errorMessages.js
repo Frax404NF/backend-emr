@@ -62,4 +62,13 @@ module.exports = {
     message: "Catatan tanda vital tidak ditemukan"
   },
 
+  // Diagnosis Errors
+  DIAGNOSIS_NOT_FOUND: {
+    code: 404,
+    message: "Diagnosis tidak ditemukan",
+  },
+  INVALID_DIAGNOSIS_DATA: {
+    code: 400,
+    message: "Data diagnosis tidak valid",
+  },
 };
