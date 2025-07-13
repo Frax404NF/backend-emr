@@ -5,6 +5,7 @@ const patientController = require("../controllers/patientController");
 const encounterController = require("../controllers/encounterController");
 const vitalSignsController = require("../controllers/clinical/vitalSignsController");
 const diagnosisController = require("../controllers/clinical/diagnosisController");
+const treatmentController = require("../controllers/clinical/treatmentController");
 
 const {
   validateSignUp,
@@ -67,5 +68,9 @@ router.post( '/encounters/:encounterId/diagnoses',authenticate, authorizeRoles([
 router.get('/encounters/:encounterId/diagnoses', authenticate, clinicalStaff, diagnosisController.getDiagnosesByEncounter);
 
 router.get('/icd10/search', authenticate, clinicalStaff, diagnosisController.searchICD10);
+
+// ===================== Treatment Routes =====================
+router.post('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.createTreatment);
+router.get('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.getTreatmentsByEncounter);
 
 module.exports = router;
