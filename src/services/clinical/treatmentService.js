@@ -4,14 +4,20 @@ const Joi = require("joi");
 // Validasi dasar untuk treatment
 const treatmentSchema = Joi.object({
   treatment_type: Joi.string().max(50).required(),
-  treatments_details: Joi.object().required(), // JSONB fleksibel
-}).required();
+  administered_at: Joi.date().iso().required(),
+  treatments_details: Joi.object().required(),
+});
 
 exports.createTreatment = async (encounterId, treatmentData, staffId) => {
-  // Validasi input
+  // Debug: log payload yang diterima
+  console.log("Payload diterima di service:", treatmentData);
   const { error, value } = treatmentSchema.validate(treatmentData);
   if (error) {
-    throw new Error(`Invalid treatment data: ${error.details[0].message}`);
+    console.error("Joi validation error (service):", error.details);
+    const err = new Error(`Invalid treatment data: ${error.details[0].message}`);
+    err.details = error.details; // Pass Joi details to controller
+    throw err;
+    // Setelah throw, eksekusi berhenti otomatis
   }
 
   // Cek encounter
@@ -28,20 +34,25 @@ exports.createTreatment = async (encounterId, treatmentData, staffId) => {
     throw new Error("Tidak dapat menambahkan treatment untuk encounter yang tidak aktif");
   }
 
+  // Pastikan value hasil validasi ada
+  if (!value) {
+    throw new Error("Validasi gagal, data treatment tidak valid");
+  }
+
   // Simpan ke database
+  const treatmentPayload = {
+    encounter_id: encounterId,
+    treatment_type: value.treatment_type,
+    treatments_details: value.treatments_details,
+    administered_by: staffId,
+    created_by: staffId,
+    updated_by: staffId,
+    administered_at: value.administered_at || new Date().toISOString(),
+  };
+
   const { data, error: insertError } = await supabase
     .from("treatments")
-    .insert([
-      {
-        encounter_id: encounterId,
-        treatment_type: value.treatment_type,
-        treatments_details: value.treatments_details,
-        administered_by: staffId,
-        created_by: staffId,
-        updated_by: staffId,
-        administered_at: new Date().toISOString(),
-      },
-    ])
+    .insert([treatmentPayload])
     .select(`
       treatment_id,
       encounter_id,
