@@ -102,7 +102,8 @@ const getFullEncounter = async (encounterId) => {
         test_id,
         test_type,
         test_name,
-        results
+        results,
+        status
       ),
       soap_notes(
         soap_note_id,
