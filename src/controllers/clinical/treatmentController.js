@@ -20,11 +20,16 @@ exports.createTreatment = async (req, res) => {
     let message = error.message;
 
     if (error.message.includes("Invalid treatment data")) {
-      status = errorMessages.TREATMENT_INVALID?.code || 400;
-      message = errorMessages.TREATMENT_INVALID?.message || error.message;
+      if (errorMessages && errorMessages.TREATMENT_INVALID) {
+        status = errorMessages.TREATMENT_INVALID.code;
+        message = errorMessages.TREATMENT_INVALID.message;
+      } else {
+        status = 400;
+        message = "Data treatment tidak valid";
+      }
     } else if (error.message.includes("Encounter tidak ditemukan")) {
-      status = errorMessages.ENCOUNTER_NOT_FOUND.code;
-      message = errorMessages.ENCOUNTER_NOT_FOUND.message;
+      status = errorMessages.ENCOUNTER_NOT_FOUND?.code || 404;
+      message = errorMessages.ENCOUNTER_NOT_FOUND?.message || "Encounter tidak ditemukan";
     } else if (error.message.includes("tidak aktif")) {
       status = 400;
       message = "Encounter tidak dalam status aktif";
