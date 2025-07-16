@@ -71,4 +71,14 @@ module.exports = {
     code: 400,
     message: "Data diagnosis tidak valid",
   },
+
+  // Treatment Errors
+   TREATMENT_INVALID: {
+    code: 400,
+    message: "Data treatment tidak valid"
+  },
+  TREATMENT_NOT_FOUND: {
+    code: 404,
+    message: "Treatment tidak ditemukan"
+  },
 };
