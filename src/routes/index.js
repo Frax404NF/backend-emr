@@ -6,6 +6,8 @@ const encounterController = require("../controllers/encounterController");
 const vitalSignsController = require("../controllers/clinical/vitalSignsController");
 const diagnosisController = require("../controllers/clinical/diagnosisController");
 const treatmentController = require("../controllers/clinical/treatmentController");
+
+const diagnosticTestController = require("../controllers/clinical/diagnosticTestController");
 const soapNotesController = require("../controllers/clinical/soapNotesController");
 
 const {
@@ -20,8 +22,6 @@ const {
 const { authenticate } = require("../middleware/authMiddleware");
 const {
   authorizeRoles,
-  doctorOnly,
-  nurseOnly,
   clinicalStaff,
 } = require("../middleware/rbac");
 
@@ -71,6 +71,12 @@ router.get('/icd10/search', authenticate, clinicalStaff, diagnosisController.sea
 // ===================== Treatment Routes =====================
 router.post('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.createTreatment);
 router.get('/encounters/:encounterId/treatments', authenticate, clinicalStaff, treatmentController.getTreatmentsByEncounter);
+
+// ===================== Diagnostic Test Routes =====================
+router.post('/encounters/:encounterId/diagnostic-tests', authenticate, clinicalStaff, diagnosticTestController.createDiagnosticTest);
+router.get('/encounters/:encounterId/diagnostic-tests', authenticate, clinicalStaff, diagnosticTestController.getDiagnosticTestsByEncounter);
+router.get('/diagnostic-tests/:id', authenticate, clinicalStaff, diagnosticTestController.getDiagnosticTestById);
+router.patch('/diagnostic-tests/:id', authenticate, clinicalStaff, diagnosticTestController.updateDiagnosticTest);
 
 // ===================== SOAP Notes Routes =====================
 router.post('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, soapNotesController.createSoapNote);
