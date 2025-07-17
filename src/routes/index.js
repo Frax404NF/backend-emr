@@ -6,9 +6,9 @@ const encounterController = require("../controllers/encounterController");
 const vitalSignsController = require("../controllers/clinical/vitalSignsController");
 const diagnosisController = require("../controllers/clinical/diagnosisController");
 const treatmentController = require("../controllers/clinical/treatmentController");
-
 const diagnosticTestController = require("../controllers/clinical/diagnosticTestController");
 const soapNotesController = require("../controllers/clinical/soapNotesController");
+const staffController = require("../controllers/staffController");
 
 const {
   validateSignUp,
@@ -81,5 +81,8 @@ router.patch('/diagnostic-tests/:id', authenticate, clinicalStaff, diagnosticTes
 // ===================== SOAP Notes Routes =====================
 router.post('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, soapNotesController.createSoapNote);
 router.get('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, soapNotesController.getSoapNotesByEncounter);
+
+// ===================== Staff Routes =====================
+router.get("/staff", authenticate, staffController.getDoctorAndNurseStaff);
 
 module.exports = router;
