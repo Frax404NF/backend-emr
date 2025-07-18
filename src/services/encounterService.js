@@ -100,10 +100,18 @@ const getFullEncounter = async (encounterId) => {
       ),
       diagnostic_tests(
         test_id,
+        encounter_id,
         test_type,
         test_name,
+        requested_by,
+        requested_at,
         results,
-        status
+        status,
+        processed_by,
+        processed_at,
+        completed_at,
+        requested_staff:requested_by(staff_id, staff_name),
+        processed_staff:processed_by(staff_id, staff_name)
       ),
       soap_notes(
         soap_note_id,
