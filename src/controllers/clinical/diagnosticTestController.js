@@ -8,7 +8,6 @@ const diagnosticTestService = require("../../services/clinical/diagnosticTestSer
 const { getStatusFlowInfo } = diagnosticTestService;
 const STATUS_FLOW = getStatusFlowInfo();
 const STATUS_TRANSITIONS = STATUS_FLOW.transitions;
-const REQUIRED_FIELDS = STATUS_FLOW.required_fields;
 
 // Helper function to calculate processing metrics
 const calculateProcessingMetrics = (testData) => {
@@ -33,36 +32,8 @@ exports.updateDiagnosticTest = async (req, res) => {
     const updateData = req.body;
     const staffId = req.user.staff_id;
 
-    // Ambil data test saat ini
-    const { data: currentTest, error: fetchError } = await supabase
-      .from("diagnostic_tests")
-      .select("*")
-      .eq("test_id", id)
-      .single();
-    if (fetchError || !currentTest) {
-      return res.status(404).json({ success: false, message: "Diagnostic test tidak ditemukan" });
-    }
-
-    // Validasi transisi status
-    if (updateData.status) {
-      const allowedTransitions = STATUS_TRANSITIONS[currentTest.status] || [];
-      if (!allowedTransitions.includes(updateData.status)) {
-        return res.status(400).json({
-          success: false,
-          message: `Transisi status dari ${currentTest.status} ke ${updateData.status} tidak diizinkan`,
-          allowed_transitions: allowedTransitions
-        });
-      }
-      // Validasi field wajib
-      const requiredFields = REQUIRED_FIELDS[updateData.status] || [];
-      for (const field of requiredFields) {
-        if (!updateData[field]) {
-          return res.status(400).json({
-            success: false,
-            message: `Field ${field} wajib diisi untuk status ${updateData.status}`
-          });
-        }
-      }
+    // Gunakan service layer untuk update dan hashing
+    try {
       // Set waktu otomatis
       if (updateData.status === 'IN_PROGRESS' && !updateData.processed_at) {
         updateData.processed_at = new Date().toISOString();
@@ -73,44 +44,29 @@ exports.updateDiagnosticTest = async (req, res) => {
       if (updateData.status === 'RESULT_VERIFIED' && !updateData.verified_at) {
         updateData.verified_at = new Date().toISOString();
       }
-    }
 
-    // Update di database
-    const { data, error } = await supabase
-      .from("diagnostic_tests")
-      .update({
-        ...updateData,
-        updated_by: staffId,
-        updated_at: new Date().toISOString()
-      })
-      .eq("test_id", id)
-      .select(`
-        *,
-        requested_staff:requested_by(staff_id, staff_name),
-        processed_staff:processed_by(staff_id, staff_name)
-      `)
-      .single();
+      // Update dan hash via service
+      const updatedTest = await diagnosticTestService.updateDiagnosticTest(id, updateData, staffId);
 
-    if (error) {
-      throw new Error(`Gagal update diagnostic test: ${error.message}`);
-    }
-
-    // Tambahkan available_transitions dan processing_metrics
-    const availableTransitions = STATUS_TRANSITIONS[data.status] || [];
-    let processingMetrics = {};
-    if (data.status === 'COMPLETED' || data.status === 'RESULT_VERIFIED') {
-      processingMetrics = calculateProcessingMetrics(data);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Diagnostic test berhasil diupdate",
-      data: {
-        ...data,
-        available_transitions: availableTransitions,
-        ...(Object.keys(processingMetrics).length > 0 && { processing_metrics: processingMetrics })
+      // Tambahkan available_transitions dan processing_metrics
+      const availableTransitions = STATUS_TRANSITIONS[updatedTest.status] || [];
+      let processingMetrics = {};
+      if (updatedTest.status === 'COMPLETED' || updatedTest.status === 'RESULT_VERIFIED') {
+        processingMetrics = calculateProcessingMetrics(updatedTest);
       }
-    });
+
+      res.status(200).json({
+        success: true,
+        message: "Diagnostic test berhasil diupdate",
+        data: {
+          ...updatedTest,
+          available_transitions: availableTransitions,
+          ...(Object.keys(processingMetrics).length > 0 && { processing_metrics: processingMetrics })
+        }
+      });
+    } catch (err) {
+      res.status(400).json({ success: false, message: err.message });
+    }
   } catch (error) {
     res.status(500).json({
       success: false,
