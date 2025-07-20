@@ -2,93 +2,195 @@ const supabase = require("../../config/supabase");
 const Joi = require("joi");
 const crypto = require("crypto");
 
-// Helper: Deterministic JSON normalization
-function toDeterministicJSON(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map((item) => toDeterministicJSON(item));
-  } else if (obj && typeof obj === "object") {
-    const sortedObj = {};
-    Object.keys(obj)
-      .sort()
-      .forEach((key) => {
-        sortedObj[key] = toDeterministicJSON(obj[key]);
-      });
-    return sortedObj;
+// Configuration
+const CONFIG = {
+  DEBUG_HASH: process.env.DEBUG_HASH === "1",
+  ACTIVE_ENCOUNTER_STATUSES: ["ONGOING", "OBSERVATION"],
+  SELECT_FIELDS: `
+    test_id, encounter_id, test_type, test_name, requested_by, requested_at,
+    results, status, processed_by, processed_at, completed_at,
+    requested_staff:requested_by(staff_id, staff_name),
+    processed_staff:processed_by(staff_id, staff_name)
+  `,
+};
+
+const STATUS_FLOW = {
+  REQUESTED: { next: ["IN_PROGRESS"], required: [] },
+  IN_PROGRESS: { next: ["COMPLETED"], required: ["processed_by"] },
+  COMPLETED: { next: ["RESULT_VERIFIED"], required: ["results"] },
+  RESULT_VERIFIED: { next: [], required: ["results_tx_hash"] },
+};
+
+// Validation schemas
+const schemas = {
+  diagnosticTest: Joi.object({
+    test_type: Joi.string()
+      .valid("LAB", "RADIOLOGY", "ECG", "USG", "OTHER")
+      .required(),
+    test_name: Joi.string().max(255).required(),
+    results: Joi.object().optional(),
+    status: Joi.string().valid("REQUESTED").default("REQUESTED"),
+  }),
+};
+
+// Custom error classes
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ValidationError";
   }
-  return obj;
 }
 
-// Helper: Generate consistent SHA-256 hash
-function generateConsistentHash(data) {
-  const normalizedData = toDeterministicJSON(data);
-  const jsonString = JSON.stringify(normalizedData);
-  // Debug: print normalized JSON string for hash
-  if (process.env.DEBUG_HASH === "1") {
-    console.log("[DEBUG] Normalized JSON for hash:", jsonString);
+class NotFoundError extends Error {
+  constructor(resource) {
+    super(`${resource} tidak ditemukan`);
+    this.name = "NotFoundError";
   }
-  const hash = crypto.createHash("sha256");
-  hash.update(jsonString);
-  return hash.digest("hex");
 }
 
-// Helper: Build result hash payload
-function buildResultHashPayload(test) {
-  // Helper to normalize date to ISO string with Z
-  function normalizeDate(val) {
+// Utility functions
+const utils = {
+  toDeterministicJSON(obj) {
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.toDeterministicJSON(item));
+    }
+    if (obj && typeof obj === "object") {
+      return Object.keys(obj)
+        .sort()
+        .reduce((sortedObj, key) => {
+          sortedObj[key] = this.toDeterministicJSON(obj[key]);
+          return sortedObj;
+        }, {});
+    }
+    return obj;
+  },
+
+  generateHash(data) {
+    const normalizedData = this.toDeterministicJSON(data);
+    const jsonString = JSON.stringify(normalizedData);
+
+    if (CONFIG.DEBUG_HASH) {
+      console.log("[DEBUG] Normalized JSON for hash:", jsonString);
+    }
+
+    return crypto.createHash("sha256").update(jsonString).digest("hex");
+  },
+
+  normalizeDate(val) {
     if (!val) return null;
     const d = new Date(val);
     return isNaN(d.getTime()) ? val : d.toISOString();
+  },
+
+  buildHashPayload(test) {
+    return {
+      test_id: test.test_id,
+      encounter_id: test.encounter_id,
+      test_type: test.test_type,
+      test_name: test.test_name,
+      requested_by: test.requested_by,
+      requested_at: this.normalizeDate(test.requested_at),
+      requested_staff:
+        test.requested_staff ||
+        (test.requested_by ? { staff_id: test.requested_by } : null),
+      results: test.results,
+      status: test.status,
+      processed_by: test.processed_by,
+      processed_at: this.normalizeDate(test.processed_at),
+      processed_staff:
+        test.processed_staff ||
+        (test.processed_by ? { staff_id: test.processed_by } : null),
+      completed_at: this.normalizeDate(test.completed_at),
+    };
+  },
+};
+
+// Database operations
+class DatabaseService {
+  static async fetchResource(table, field, value, errorMessage) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq(field, value)
+      .single();
+
+    if (error || !data) {
+      throw new NotFoundError(errorMessage);
+    }
+
+    return data;
   }
 
-  const payload = {
-    test_id: test.test_id,
-    encounter_id: test.encounter_id,
-    test_type: test.test_type,
-    test_name: test.test_name,
-    requested_by: test.requested_by,
-    requested_at: normalizeDate(test.requested_at),
-    requested_staff: test.requested_staff || (test.requested_by ? { staff_id: test.requested_by } : null),
-    results: test.results,
-    status: test.status,
-    processed_by: test.processed_by,
-    processed_at: normalizeDate(test.processed_at),
-    processed_staff: test.processed_staff || (test.processed_by ? { staff_id: test.processed_by } : null),
-    completed_at: normalizeDate(test.completed_at)
-  };
-  // Debug print
-  console.log("[DEBUG] buildResultHashPayload:", JSON.stringify(payload, null, 2));
-  return payload;
+  static async fetchStaff(staffId) {
+    return this.fetchResource(
+      "medic_staff",
+      "staff_id",
+      staffId,
+      `Staff dengan ID ${staffId}`
+    );
+  }
+
+  static async fetchEncounter(encounterId) {
+    return this.fetchResource(
+      "encounters",
+      "encounter_id",
+      encounterId,
+      "Encounter"
+    );
+  }
+
+  static async fetchDiagnosticTest(testId) {
+    return this.fetchResource(
+      "diagnostic_tests",
+      "test_id",
+      testId,
+      "Diagnostic test"
+    );
+  }
+
+  static async ensureStaffObject(hashData, staffField, staffIdField) {
+    if (hashData[staffField]?.staff_name) return;
+
+    const staffId = hashData[staffField]?.staff_id || hashData[staffIdField];
+    if (!staffId) return;
+
+    try {
+      const staff = await this.fetchStaff(staffId);
+      hashData[staffField] = {
+        staff_id: staff.staff_id,
+        staff_name: staff.staff_name,
+      };
+    } catch {
+      hashData[staffField] = { staff_id: staffId };
+    }
+  }
 }
-// Update diagnostic test (PATCH) with hash logic
-exports.updateDiagnosticTest = async (testId, updateData, staffId) => {
-  // Get current test data
-  const { data: currentTest, error: fetchError } = await supabase
-    .from("diagnostic_tests")
-    .select("*")
-    .eq("test_id", testId)
-    .single();
-  if (fetchError || !currentTest) {
-    throw new Error("Diagnostic test tidak ditemukan");
-  }
 
-  // Validasi transisi status dan field wajib
-  const statusFlow = exports.getStatusFlowInfo();
-  if (updateData.status) {
-    const allowedTransitions = statusFlow.transitions[currentTest.status] || [];
-    if (!allowedTransitions.includes(updateData.status)) {
-      throw new Error(`Transisi status dari ${currentTest.status} ke ${updateData.status} tidak diizinkan. Allowed: ${allowedTransitions.join(", ")}`);
-    }
-    // Validasi field wajib
-    const requiredFields = statusFlow.required_fields[updateData.status] || [];
-    for (const field of requiredFields) {
-      if (!updateData[field]) {
-        throw new Error(`Field '${field}' wajib diisi untuk status ${updateData.status}`);
-      }
+// Validation service
+class ValidationService {
+  static validateStatusTransition(currentStatus, newStatus) {
+    const allowedNext = STATUS_FLOW[currentStatus]?.next || [];
+    if (!allowedNext.includes(newStatus)) {
+      throw new ValidationError(
+        `Transisi status dari ${currentStatus} ke ${newStatus} tidak diizinkan. Allowed: ${allowedNext.join(
+          ", "
+        )}`
+      );
     }
   }
 
-  // Pastikan relasi staff dari database masuk ke hashData sebelum validasi hash
-  if (updateData.status === "COMPLETED") {
+  static validateRequiredFields(status, data) {
+    const required = STATUS_FLOW[status]?.required || [];
+    const missing = required.filter((field) => !data[field]);
+
+    if (missing.length > 0) {
+      throw new ValidationError(
+        `Field '${missing.join("', '")}' wajib diisi untuk status ${status}`
+      );
+    }
+  }
+
+  static validateHashFields(hashData) {
     const requiredForHash = [
       "encounter_id",
       "test_type",
@@ -101,257 +203,211 @@ exports.updateDiagnosticTest = async (testId, updateData, staffId) => {
       "processed_by",
       "processed_at",
       "processed_staff",
-      "completed_at"
+      "completed_at",
     ];
-    let hashData = { ...currentTest, ...updateData, status: "COMPLETED" };
 
-    // Helper to fetch staff object if only staff_id is present
-    async function ensureStaffObject(staffField, staffIdField) {
-      if (!hashData[staffField] || !hashData[staffField].staff_name) {
-        const staffId = hashData[staffField]?.staff_id || hashData[staffIdField];
-        if (staffId) {
-          const { data: staffObj } = await supabase
-            .from("medic_staff")
-            .select("staff_id, staff_name")
-            .eq("staff_id", staffId)
-            .single();
-          if (staffObj) {
-            hashData[staffField] = { staff_id: staffObj.staff_id, staff_name: staffObj.staff_name };
-          } else {
-            hashData[staffField] = { staff_id: staffId };
-          }
-        }
-      }
-    }
+    const missing = requiredForHash.filter((field) => {
+      const value = hashData[field];
+      return (
+        value === undefined ||
+        value === null ||
+        (field === "results" && Object.keys(value || {}).length === 0)
+      );
+    });
 
-    // Ensure requested_staff and processed_staff have staff_name
-    await ensureStaffObject("requested_staff", "requested_by");
-    await ensureStaffObject("processed_staff", "processed_by");
-
-    for (const field of requiredForHash) {
-      if (
-        hashData[field] === undefined ||
-        hashData[field] === null ||
-        (field === "results" && Object.keys(hashData.results || {}).length === 0)
-      ) {
-        throw new Error(`Field '${field}' wajib diisi dan konsisten untuk hashing hasil diagnostic test.`);
-      }
+    if (missing.length > 0) {
+      throw new ValidationError(
+        `Field '${missing.join(
+          "', '"
+        )}' wajib diisi dan konsisten untuk hashing hasil diagnostic test.`
+      );
     }
   }
 
-  // If status becomes COMPLETED and results exist, generate hash
-  let results_hash = undefined;
-  if (updateData.status === "COMPLETED" && updateData.results) {
-    // Ambil staff info dari relasi jika belum ada di updateData
-    let hashSource = { ...currentTest, ...updateData, status: "COMPLETED" };
-    // Ensure staff objects have staff_name
-    async function ensureStaffObjectHash(staffField, staffIdField) {
-      if (!hashSource[staffField] || !hashSource[staffField].staff_name) {
-        const staffId = hashSource[staffField]?.staff_id || hashSource[staffIdField];
-        if (staffId) {
-          const { data: staffObj } = await supabase
-            .from("medic_staff")
-            .select("staff_id, staff_name")
-            .eq("staff_id", staffId)
-            .single();
-          if (staffObj) {
-            hashSource[staffField] = { staff_id: staffObj.staff_id, staff_name: staffObj.staff_name };
-          } else {
-            hashSource[staffField] = { staff_id: staffId };
-          }
-        }
-      }
+  static validateInput(schema, data) {
+    const { error, value } = schema.validate(data);
+    if (error) {
+      throw new ValidationError(`Invalid data: ${error.details[0].message}`);
     }
-    await ensureStaffObjectHash("requested_staff", "requested_by");
-    await ensureStaffObjectHash("processed_staff", "processed_by");
-    const hashPayload = buildResultHashPayload(hashSource);
-    results_hash = generateConsistentHash(hashPayload);
-    updateData.results_hash = results_hash;
+    return value;
   }
-
-  // Update database
-  const { data, error } = await supabase
-    .from("diagnostic_tests")
-    .update({
-      ...updateData,
-      updated_by: staffId,
-      updated_at: new Date().toISOString()
-    })
-    .eq("test_id", testId)
-    .select(`
-      *,
-      requested_staff:requested_by(staff_id, staff_name),
-      processed_staff:processed_by(staff_id, staff_name)
-    `)
-    .single();
-
-  if (error) {
-    throw new Error(`Gagal update diagnostic test: ${error.message}`);
-  }
-
-  return data;
 }
 
-// Validasi dasar untuk diagnostic test
-const diagnosticTestSchema = Joi.object({
-  test_type: Joi.string().valid("LAB", "RADIOLOGY", "ECG", "USG", "OTHER").required(),
-  test_name: Joi.string().max(255).required(),
-  results: Joi.object().optional(),
-  status: Joi.string().valid("REQUESTED").default("REQUESTED") // Only REQUESTED allowed on creation
-}).required();
+// Hash service
+class HashService {
+  static async generateResultsHash(testData) {
+    // Ensure staff objects are complete
+    await Promise.all([
+      DatabaseService.ensureStaffObject(
+        testData,
+        "requested_staff",
+        "requested_by"
+      ),
+      DatabaseService.ensureStaffObject(
+        testData,
+        "processed_staff",
+        "processed_by"
+      ),
+    ]);
 
-exports.createDiagnosticTest = async (encounterId, testData, staffId) => {
-  // Validasi input
-  const { error, value } = diagnosticTestSchema.validate(testData);
-  if (error) {
-    throw new Error(`Invalid diagnostic test data: ${error.details[0].message}`);
+    ValidationService.validateHashFields(testData);
+
+    const hashPayload = utils.buildHashPayload(testData);
+    return utils.generateHash(hashPayload);
+  }
+}
+
+// Main service class
+class DiagnosticTestService {
+  static async create(encounterId, testData, staffId) {
+    // Validate input
+    const validatedData = ValidationService.validateInput(
+      schemas.diagnosticTest,
+      testData
+    );
+
+    // Validate encounter and staff
+    const [encounter, staff] = await Promise.all([
+      DatabaseService.fetchEncounter(encounterId),
+      DatabaseService.fetchStaff(staffId),
+    ]);
+
+    if (!CONFIG.ACTIVE_ENCOUNTER_STATUSES.includes(encounter.status)) {
+      throw new ValidationError(
+        "Tidak dapat menambahkan diagnostic test untuk encounter yang tidak aktif"
+      );
+    }
+
+    const now = new Date().toISOString();
+    const insertData = {
+      encounter_id: encounterId,
+      test_type: validatedData.test_type,
+      test_name: validatedData.test_name,
+      requested_by: staffId,
+      requested_at: now,
+      results: validatedData.results || null,
+      status: "REQUESTED",
+      processed_by: null,
+      processed_at: null,
+      completed_at: null,
+      created_by: staffId,
+      updated_by: staffId,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const { data, error } = await supabase
+      .from("diagnostic_tests")
+      .insert([insertData])
+      .select(CONFIG.SELECT_FIELDS)
+      .single();
+
+    if (error) {
+      throw new Error(`Gagal menyimpan diagnostic test: ${error.message}`);
+    }
+
+    // Add available transitions
+    data.available_transitions = STATUS_FLOW[data.status]?.next || [];
+    return data;
   }
 
-  // Force status to REQUESTED for new tests
-  value.status = "REQUESTED";
+  static async update(testId, updateData, staffId) {
+    const currentTest = await DatabaseService.fetchDiagnosticTest(testId);
 
-  // Cek encounter
-  const { data: encounter, error: encounterError } = await supabase
-    .from("encounters")
-    .select("encounter_id, status")
-    .eq("encounter_id", encounterId)
-    .single();
-  if (encounterError || !encounter) {
-    throw new Error("Encounter tidak ditemukan");
-  }
-  const activeStatuses = ["ONGOING", "OBSERVATION"];
-  if (!activeStatuses.includes(encounter.status)) {
-    throw new Error("Tidak dapat menambahkan diagnostic test untuk encounter yang tidak aktif");
-  }
+    // Validate status transition
+    if (updateData.status) {
+      ValidationService.validateStatusTransition(
+        currentTest.status,
+        updateData.status
+      );
+      ValidationService.validateRequiredFields(updateData.status, updateData);
+    }
 
-  // Validasi staff
-  const { data: staff, error: staffError } = await supabase
-    .from("medic_staff")
-    .select("staff_id, staff_name")
-    .eq("staff_id", staffId)
-    .single();
-  if (staffError || !staff) {
-    throw new Error(`Staff dengan ID ${staffId} tidak ditemukan`);
-  }
+    // Generate hash for COMPLETED status
+    if (updateData.status === "COMPLETED") {
+      const hashData = { ...currentTest, ...updateData, status: "COMPLETED" };
+      updateData.results_hash = await HashService.generateResultsHash(hashData);
+    }
 
-  // Simpan ke database
-  const { data, error: insertError } = await supabase
-    .from("diagnostic_tests")
-    .insert([
-      {
-        encounter_id: encounterId,
-        test_type: value.test_type,
-        test_name: value.test_name,
-        requested_by: staffId,
-        requested_at: new Date().toISOString(),
-        results: value.results || null,
-        status: value.status,
-        processed_by: value.processed_by || null,
-        processed_at: value.processed_at || null,
-        completed_at: value.completed_at || null,
-        created_by: staffId,
+    // Update database
+    const { data, error } = await supabase
+      .from("diagnostic_tests")
+      .update({
+        ...updateData,
         updated_by: staffId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ])
-    .select(`
-      test_id,
-      encounter_id,
-      test_type,
-      test_name,
-      requested_by,
-      requested_at,
-      results,
-      status,
-      processed_by,
-      processed_at,
-      completed_at,
-      requested_staff:requested_by(staff_id, staff_name),
-      processed_staff:processed_by(staff_id, staff_name)
-    `)
-    .single();
+        updated_at: new Date().toISOString(),
+      })
+      .eq("test_id", testId)
+      .select(CONFIG.SELECT_FIELDS)
+      .single();
 
-  if (insertError) {
-    throw new Error(`Gagal menyimpan diagnostic test: ${insertError.message}`);
-  }
-  // Add available transitions for frontend
-  data.available_transitions = ["IN_PROGRESS"];
-  return data;
-};
-
-exports.getDiagnosticTestsByEncounter = async (encounterId) => {
-  const { data, error } = await supabase
-    .from("diagnostic_tests")
-    .select(`
-      test_id,
-      encounter_id,
-      test_type,
-      test_name,
-      requested_by,
-      requested_at,
-      results,
-      status,
-      processed_by,
-      processed_at,
-      completed_at,
-      requested_staff:requested_by(staff_id, staff_name),
-      processed_staff:processed_by(staff_id, staff_name)
-    `)
-    .eq("encounter_id", encounterId)
-    .order("requested_at", { ascending: false });
-
-  if (error) {
-    throw new Error(`Gagal mengambil data diagnostic test: ${error.message}`);
-  }
-  return data;
-};
-
-exports.getDiagnosticTestById = async (testId) => {
-  const { data, error } = await supabase
-    .from("diagnostic_tests")
-    .select(`
-      test_id,
-      encounter_id,
-      test_type,
-      test_name,
-      requested_by,
-      requested_at,
-      results,
-      status,
-      processed_by,
-      processed_at,
-      completed_at,
-      requested_staff:requested_by(staff_id, staff_name),
-      processed_staff:processed_by(staff_id, staff_name)
-    `)
-    .eq("test_id", testId)
-    .single();
-
-  if (error) {
-    if (error.code === "PGRST116") {
-      return null;
+    if (error) {
+      throw new Error(`Gagal update diagnostic test: ${error.message}`);
     }
-    throw new Error(`Gagal mengambil data diagnostic test: ${error.message}`);
+
+    return data;
   }
 
-  return data;
-};
+  static async getByEncounter(encounterId) {
+    const { data, error } = await supabase
+      .from("diagnostic_tests")
+      .select(CONFIG.SELECT_FIELDS)
+      .eq("encounter_id", encounterId)
+      .order("requested_at", { ascending: false });
 
-// Helper function to get status flow info
-exports.getStatusFlowInfo = function() {
-  return {
-    statuses: ['REQUESTED', 'IN_PROGRESS', 'COMPLETED', 'RESULT_VERIFIED'],
-    transitions: {
-      'REQUESTED': ['IN_PROGRESS'],
-      'IN_PROGRESS': ['COMPLETED'],
-      'COMPLETED': ['RESULT_VERIFIED'],
-      'RESULT_VERIFIED': []
-    },
-    required_fields: {
-      'IN_PROGRESS': ['processed_by'],
-      'COMPLETED': ['results'],
-      'RESULT_VERIFIED': ['results_tx_hash']
+    if (error) {
+      throw new Error(`Gagal mengambil data diagnostic test: ${error.message}`);
     }
-  };
+
+    return data;
+  }
+
+  static async getById(testId) {
+    const { data, error } = await supabase
+      .from("diagnostic_tests")
+      .select(CONFIG.SELECT_FIELDS)
+      .eq("test_id", testId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      throw new Error(`Gagal mengambil data diagnostic test: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  static getStatusFlow() {
+    return {
+      statuses: Object.keys(STATUS_FLOW),
+      transitions: Object.entries(STATUS_FLOW).reduce(
+        (acc, [status, config]) => {
+          acc[status] = config.next;
+          return acc;
+        },
+        {}
+      ),
+      required_fields: Object.entries(STATUS_FLOW).reduce(
+        (acc, [status, config]) => {
+          acc[status] = config.required;
+          return acc;
+        },
+        {}
+      ),
+    };
+  }
+}
+
+// Export with backward compatibility
+module.exports = {
+  createDiagnosticTest: DiagnosticTestService.create,
+  updateDiagnosticTest: DiagnosticTestService.update,
+  getDiagnosticTestsByEncounter: DiagnosticTestService.getByEncounter,
+  getDiagnosticTestById: DiagnosticTestService.getById,
+  getStatusFlowInfo: DiagnosticTestService.getStatusFlow,
+
+  // Export classes for advanced usage
+  DiagnosticTestService,
+  ValidationError,
+  NotFoundError,
 };
