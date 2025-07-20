@@ -40,4 +40,4 @@ baseline.sql
 docs/
 
 #draft file
-src/services/hash.js
+src/services/hash
