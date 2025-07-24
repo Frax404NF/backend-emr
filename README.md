@@ -1,7 +1,10 @@
+
 # EMR API
 
 ## Overview
-Electronic Medical Records (EMR) API system built with Node.js, Express, and Supabase. This API provides secure authentication and comprehensive patient management capabilities for healthcare applications.
+This Electronic Medical Records (EMR) API is a backend system built with Node.js, Express, and Supabase. It provides secure authentication, comprehensive patient management, and a full suite of clinical modules for healthcare applications. The API is designed for modularity, scalability, and maintainability, supporting both administrative and clinical workflows.
+
+---
 
 ## Features
 
@@ -17,6 +20,20 @@ Electronic Medical Records (EMR) API system built with Node.js, Express, and Sup
 - Server-side pagination and search capabilities
 - Role-based access control for data security
 - Comprehensive validation and error handling
+
+### 🏥 Clinical Modules
+- Diagnosis management with ICD-10 integration
+- Diagnostic test workflows (lab, radiology, ECG, USG, etc.)
+- SOAP notes (Subjective, Objective, Assessment, Plan) for encounters
+- Treatment recording and validation
+- Vital signs recording and validation
+
+### ⚙️ Utility & Infrastructure
+- Centralized error handling and response formatting
+- State machine logic for status transitions
+- Hashing utilities for data integrity and security
+
+---
 
 ## Quick Start
 
@@ -46,43 +63,162 @@ npm start
 
 The API will be available at `http://localhost:3000`
 
-## API Documentation
+---
 
-For detailed API documentation, integration guides, and technical specifications, see the internal documentation:
+## Project Structure & Module Details
 
-- **For Frontend Developers**: Start with authentication and patient management integration guides
-- **For Backend Developers**: Review project structure and schema alignment documentation
-- **For Database Management**: Check schema requirements and validation rules
+```
+src/
+├── app.js              # Application entry point
+├── config/             # Database and external service configuration
+│   └── supabase.js     # Supabase connection setup
+├── controllers/        # Route controllers for API endpoints
+│   ├── authController.js
+│   ├── encounterController.js
+│   ├── patientController.js
+│   ├── staffController.js
+│   └── clinical/
+│       ├── diagnosisController.js
+│       ├── diagnosticTestController.js
+│       ├── soapNotesController.js
+│       ├── treatmentController.js
+│       └── vitalSignsController.js
+├── middleware/         # Custom middleware for request processing
+│   ├── authMiddleware.js
+│   ├── rbac.js
+│   └── validation.js
+├── routes/             # API route definitions
+│   └── index.js
+├── services/           # Business logic and data access
+│   ├── authService.js
+│   ├── encounterService.js
+│   ├── patientService.js
+│   ├── staffService.js
+│   ├── clinical/
+│   │   ├── diagnosisService.js
+│   │   ├── diagnosticTestService.js
+│   │   ├── soapNotesService.js
+│   │   ├── treatmentService.js
+│   │   └── vitalSignsService.js
+│   └── hash/
+│       ├── hash.js
+└── utils/              # Utility functions and helpers
+    ├── errorMessages.js
+    ├── response.js
+    └── stateMachine.js
+```
 
-**Note**: Comprehensive API documentation is available in the development environment. Contact the development team for access to detailed integration guides and code examples.
+### Module Descriptions
+
+#### app.js
+Initializes the Express application, loads middleware, and registers all routes. All HTTP requests are processed through this entry point.
+
+#### config/
+- **supabase.js**: Sets up and exports the Supabase client for database operations.
+
+#### controllers/
+Controllers handle HTTP requests, validate input, and call service functions. They return responses to the client.
+- **authController.js**: Manages staff authentication, registration, login, and profile endpoints.
+- **encounterController.js**: Handles patient encounter creation, updates, and retrieval.
+- **patientController.js**: Manages CRUD operations for patient records.
+- **staffController.js**: Handles staff management and lookup.
+- **clinical/**: Contains controllers for clinical modules:
+  - **diagnosisController.js**: Endpoints for adding and retrieving diagnoses, including ICD-10 code integration.
+  - **diagnosticTestController.js**: Endpoints for requesting, processing, and verifying diagnostic tests.
+  - **soapNotesController.js**: Endpoints for managing SOAP notes for encounters.
+  - **treatmentController.js**: Endpoints for recording treatments administered to patients.
+  - **vitalSignsController.js**: Endpoints for recording and retrieving patient vital signs.
+
+#### middleware/
+Middleware functions process requests before they reach controllers.
+- **authMiddleware.js**: Verifies authentication and token validity.
+- **rbac.js**: Implements role-based access control.
+- **validation.js**: Validates incoming request data.
+
+#### routes/
+- **index.js**: Main route file, imports and registers all route modules for the API.
+
+#### services/
+Services contain business logic and interact with the database.
+- **authService.js**: Handles authentication logic, password hashing, and token management.
+- **encounterService.js**: Manages encounter state transitions and validation.
+- **patientService.js**: Handles patient data operations.
+- **staffService.js**: Manages staff data and business rules.
+- **clinical/**: Services for clinical modules:
+  - **diagnosisService.js**: Fetches and manages diagnosis data, integrates with ICD-10 APIs.
+  - **diagnosticTestService.js**: Manages diagnostic test workflows, status transitions, and validation for various test types.
+  - **soapNotesService.js**: Validates and stores SOAP notes, ensuring notes are only added to active encounters.
+  - **treatmentService.js**: Validates and records treatments, ensuring proper association with encounters and staff.
+  - **vitalSignsService.js**: Validates and stores vital sign measurements for encounters.
+- **hash/**: Hashing utilities for data integrity and security.
+  - **hash.js**, **hash-2.js**, **hash-3.js**: Provide different hashing algorithms or implementations.
+
+#### utils/
+Utility functions and helpers used throughout the codebase.
+- **errorMessages.js**: Centralized error message definitions.
+- **response.js**: Standardizes API responses.
+- **stateMachine.js**: Implements state machine logic for managing status transitions.
+
+---
 
 ## API Endpoints
 
+
 ### Authentication
-- `POST /auth/register` - Staff registration
-- `POST /auth/login` - Staff login
-- `POST /auth/logout` - Staff logout
-- `GET /auth/profile` - Get staff profile
+- `POST /auth/register` — Staff registration
+- `POST /auth/login` — Staff login
+- `POST /auth/signout` — Staff logout
+- `GET /auth/profile` — Get staff profile
 
 ### Patient Management
-- `GET /patients` - List patients (with pagination and search)
-- `POST /patients` - Create new patient
-- `GET /patients/:id` - Get patient by ID
-- `PUT /patients/:id` - Update patient
-- `DELETE /patients/:id` - Soft delete patient
+- `GET /patients` — List patients (pagination & search)
+- `GET /patients/search` — Search patients by keyword
+- `POST /patients` — Create new patient (regular/emergency)
+- `GET /patients/:id` — Get patient by ID
+- `PUT /patients/:id` — Update patient
+- `PUT /patients/:id/emergency-to-regular` — Convert emergency patient to regular
+- `DELETE /patients/:id` — Soft delete patient
 
-## Database Schema
+### Clinical Modules
+- `POST /encounters` — Start new patient encounter
+- `PUT /encounters/:id/status` — Update encounter status
+- `GET /encounters/:id` — Get encounter details
+- `GET /encounters` — List active encounters
+
+- `POST /encounters/:id/diagnoses` — Add diagnosis to an encounter
+- `GET /encounters/:id/diagnoses` — Get diagnoses for an encounter
+- `GET /icd10/search` — Search ICD-10 codes
+
+- `POST /encounters/:id/diagnostic-tests` — Request diagnostic test
+- `GET /encounters/:id/diagnostic-tests` — List diagnostic tests for an encounter
+- `GET /diagnostic-tests/:id` — Get diagnostic test detail
+- `PATCH /diagnostic-tests/:id` — Update diagnostic test status
+
+- `POST /encounters/:id/soap-notes` — Add SOAP note to an encounter
+- `GET /encounters/:id/soap-notes` — Get SOAP notes for an encounter
+
+- `POST /encounters/:id/vitals` — Record vital signs for an encounter
+- `GET /encounters/:id/vitals` — Get vital signs for an encounter
+- `GET /vitals/:id` — Get vital sign detail
+
+---
+
+## Database Schema & Validation
 
 ### Core Entities
-- **Staff**: Medical staff with role-based permissions
-- **Patients**: Patient records with comprehensive medical information
-- **Audit Fields**: All entities include created_at, updated_at, created_by, updated_by
+- **Staff**: Medical staff with role-based permissions and audit fields.
+- **Patients**: Patient records with comprehensive medical information and audit fields.
+- **Encounters**: Records of patient visits, including status, diagnoses, tests, treatments, and notes.
+- **Audit Fields**: All entities include `created_at`, `updated_at`, `created_by`, `updated_by` for traceability.
 
 ### Validation Rules
-- Blood type validation (A+, A-, B+, B-, AB+, AB-, O+, O-)
+- Blood type validation (A, B, AB, O)
 - Phone number format (10-15 characters)
 - NIK (Indonesian ID) format validation
 - Email uniqueness and format validation
+- Input validation for all clinical modules using Joi schemas
+
+---
 
 ## Security Features
 
@@ -92,41 +228,26 @@ For detailed API documentation, integration guides, and technical specifications
 - Audit trails for all data modifications
 - Soft delete functionality to preserve data integrity
 
+---
+
 ## Technology Stack
 
 - **Backend**: Node.js, Express.js
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: JWT with bcrypt password hashing
-- **Validation**: Custom middleware with comprehensive rules
+- **Validation**: Joi and custom middleware
 - **Architecture**: RESTful API with modular structure
 
-## Development
+---
 
-### Project Structure
-```
-src/
-├── app.js              # Application entry point
-├── config/             # Configuration files
-├── controllers/        # Route controllers
-├── middleware/         # Custom middleware
-├── routes/             # API routes
-├── services/           # Business logic
-└── utils/              # Utility functions
-```
+## Development & Code Quality
 
-### Code Quality
 - ESLint configuration for code consistency
 - Comprehensive error handling
 - Modular architecture for maintainability
 - Standardized response formats
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with proper testing
-4. Ensure all validations pass
-5. Submit a pull request
+---
 
 ## License
 
@@ -142,9 +263,21 @@ This project is proprietary software developed for healthcare applications.
 - ✅ Comprehensive input validation
 - ✅ Integration with Supabase authentication
 
-### Patient Management Module  
+### Patient Management Module
 - ✅ Complete CRUD operations with audit trails
 - ✅ Soft delete functionality for data preservation
 - ✅ Advanced search and pagination capabilities
 - ✅ Schema alignment with database constraints
 - ✅ Role-based data access controls
+
+### Clinical Modules
+- ✅ Diagnosis management with ICD-10 integration
+- ✅ Diagnostic test workflow and status management
+- ✅ SOAP notes and treatment recording
+- ✅ Vital signs recording and validation
+
+---
+
+## Contact & Documentation
+
+For detailed API documentation, integration guides, and technical specifications, see the internal documentation or contact the development team for access to integration guides and code examples.
