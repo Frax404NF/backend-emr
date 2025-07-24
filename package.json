@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "pm2": "pm2 start src/app.js --name emr-api --watch",
+    "pm2-stop": "pm2 stop emr-api",
+    "pm2-restart": "pm2 restart emr-api",
+    "pm2-delete": "pm2 delete emr-api",
+    "pm2-logs": "pm2 logs emr-api"
   },
   "keywords": [],
   "author": "",
