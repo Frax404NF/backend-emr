@@ -81,4 +81,34 @@ module.exports = {
     code: 404,
     message: "Treatment tidak ditemukan"
   },
+
+  // Diagnostic Test Errors
+  DIAGNOSTIC_TEST_INVALID: {
+    code: 400,
+    message: "Data diagnostic test tidak valid"
+  },
+  DIAGNOSTIC_TEST_NOT_FOUND: {
+    code: 404,
+    message: "Diagnostic test tidak ditemukan"
+  },
+  DIAGNOSTIC_TEST_CREATION_FAILED: {
+    code: 500,
+    message: "Gagal membuat diagnostic test"
+  },
+  DIAGNOSTIC_TEST_UPDATE_FAILED: {
+    code: 500,
+    message: "Gagal memperbarui diagnostic test"
+  },
+  DIAGNOSTIC_TEST_STATUS_INVALID: {
+    code: 400,
+    message: "Status diagnostic test tidak valid"
+  },
+  DIAGNOSTIC_TEST_RESULT_REQUIRED: {
+    code: 400,
+    message: "Hasil diagnostic test diperlukan"
+  },
+  DIAGNOSTIC_TEST_RESULT_VERIFICATION_FAILED: {
+    code: 500,
+    message: "Gagal verifikasi hasil diagnostic test"
+  },
 };
