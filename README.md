@@ -72,10 +72,13 @@ src/
 ├── app.js              # Application entry point
 ├── config/             # Database and external service configuration
 │   └── supabase.js     # Supabase connection setup
+│   └── blockchain.js     # File baru untuk blockchain
+│   └── ContractABI.js     # File baru untuk blockchain
 ├── controllers/        # Route controllers for API endpoints
 │   ├── authController.js
 │   ├── encounterController.js
 │   ├── patientController.js
+│   ├── blockchainController.js  # File baru untuk blockchain
 │   ├── staffController.js
 │   └── clinical/
 │       ├── diagnosisController.js
@@ -100,8 +103,11 @@ src/
 │   │   ├── soapNotesService.js
 │   │   ├── treatmentService.js
 │   │   └── vitalSignsService.js
+│   ├── blockchain/
+│   │   └── blockchainService.js # File baru untuk blockchain
+│   │   └── index.js # File baru untuk blockchain
 │   └── hash/
-│       ├── hash.js
+│       ├── unifiedHashService.js # File baru untuk blockchain
 └── utils/              # Utility functions and helpers
     ├── errorMessages.js
     ├── response.js
