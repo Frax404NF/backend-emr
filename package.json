@@ -10,16 +10,30 @@
     "pm2-stop": "pm2 stop emr-api",
     "pm2-restart": "pm2 restart emr-api",
     "pm2-delete": "pm2 delete emr-api",
-    "pm2-logs": "pm2 logs emr-api"
+    "pm2-logs": "pm2 logs emr-api",
+
+    "hash:analyze": "node scripts/migrate-to-medical-hash.js analyze",
+    "hash:migrate": "node scripts/migrate-to-medical-hash.js migrate",
+    "hash:dry-run": "node scripts/migrate-to-medical-hash.js dry-run",
+    "hash:fix-test": "node scripts/migrate-to-medical-hash.js fix-test",
+    "hash:force-all": "node scripts/migrate-to-medical-hash.js force-all",
+
+    "hash:debug": "DEBUG_HASH=1 node scripts/migrate-to-medical-hash.js analyze",
+    "test:hash": "DEBUG_HASH=1 npm test -- --grep 'medical.*hash'",
+
+    "validate:implementation": "node scripts/validate-medical-hash.js",
+    "validate:blockchain": "node scripts/validate-blockchain-integration.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
+    "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
+    "corspost": "^2.8.5",
     "dotenv": "^17.0.1",
+    "ethers": "^6.15.0",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
     "express-validator": "^7.2.1",
