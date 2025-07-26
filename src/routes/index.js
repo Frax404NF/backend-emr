@@ -10,6 +10,8 @@ const diagnosticTestController = require("../controllers/clinical/diagnosticTest
 const soapNotesController = require("../controllers/clinical/soapNotesController");
 const staffController = require("../controllers/staffController");
 
+const BlockchainController = require("../controllers/blockchainController");
+
 const {
   validateSignUp,
   validateSignIn,
@@ -84,5 +86,9 @@ router.get('/encounters/:encounterId/soap-notes', authenticate, clinicalStaff, s
 
 // ===================== Staff Routes =====================
 router.get("/staff", authenticate, staffController.getDoctorAndNurseStaff);
+
+// ===================== Blockchain Routes =====================
+// Blockchain status - accessible to all authenticated users
+router.get("/blockchain/status", authenticate, BlockchainController.getStatus);
 
 module.exports = router;
